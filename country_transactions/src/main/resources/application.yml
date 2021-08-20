@@ -1,0 +1,20 @@
+server:
+  port: 8765
+
+spring:
+  sql:
+    init:
+      data-locations: classpath:db/migration/V1_create.sql
+  r2dbc:
+    url: r2dbc:h2:mem:///countrydb?options=DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=PostgreSQL
+    username: sa
+    password: password
+
+config:
+  kafka:
+    group-id: cts_consumer_group
+    key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    value-deserializer: com.leoberteck.country_transactions.serialization.CountryTransactionDeserializer
+    auto-offset-reset: latest
+    bootstrap-servers: localhost:19999,localhost:29999,localhost:39999
+    topic: country_transactions_agg_result

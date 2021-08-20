@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Country Transactions Watcher</title>
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.4.1/mapbox-gl.css" rel="stylesheet">
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.4.1/mapbox-gl.js"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <script src='https://unpkg.com/can-ndjson-stream@0.1/dist/global/can-ndjson-stream.js'></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        #map {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 100%;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="map"></div>
+    <script>
+        const axios = window.axios
+
+        mapboxgl.accessToken = 'pk.eyJ1IjoibGVvYmVydGVjayIsImEiOiJja3A0Z2xnNTUwOTNuMndrdmQ3aml6N2o4In0.NXx6jv_NEZPPNufQqpBIJg';
+        const map = new mapboxgl.Map({
+            container: 'map', // container ID
+            style: 'mapbox://styles/leoberteck/cksibsdac0u4i18nz2uynjjyx', // style URL
+            center: [0, 0], // starting position [lng, lat]
+            zoom: 2 // starting zoom
+        });
+
+        map.on('load', () => axios.get('/v1/actual-state')
+            .then((response) => {
+                var sourceData = {
+                    'type': 'FeatureCollection',
+                    'features': []
+                }
+
+                const balanceFormatter = new Intl.NumberFormat('en-US', {
+                    style: 'currency',
+                    currency: 'USD',
+                });
+
+                for (var x = 0, count = response.data.length; x < count; x++) {
+                    var d = response.data[x]
+                    sourceData.features.push(
+                        {
+                            'type': 'Feature',
+                            'properties': {
+                                'countryName': d.countryName,
+                                'countryCode': d.countryCode,
+                                'balance': d.balance,
+                                'balanceFormatted': balanceFormatter.format(d.balance)
+                            },
+                            'geometry': {
+                                'type': 'Point',
+                                'coordinates': [d.countryLng, d.countryLat]
+                            }
+                        }
+                    )
+                }
+
+                map.addSource('countries', {
+                    'type': 'geojson',
+                    'data': sourceData
+                });
+
+                map.addLayer({
+                    'id': 'country-names',
+                    'type': 'symbol',
+                    'source': 'countries',
+                    'layout': {
+                        'text-field': ['get', 'countryName'],
+                        'text-justify': 'center',
+                        'text-allow-overlap': false,
+                        'text-ignore-placement': false,
+                        'text-max-width': 50,
+                        'text-offset': [0, -1.5]
+                    }
+                });
+
+                map.addLayer({
+                    'id': 'country-balances',
+                    'type': 'symbol',
+                    'source': 'countries',
+                    'layout': {
+                        'text-field': ['get', 'balanceFormatted'],
+                        'text-radial-offset': 0.5,
+                        'text-justify': 'center',
+                        'text-allow-overlap': false,
+                        'text-ignore-placement': false,
+                        'text-font': ['Open Sans Semibold', 'Arial Unicode MS Bold']
+                    },
+                    'paint': {
+                        'text-color': [
+                            'interpolate',
+                            ['linear'],
+                            ['get', 'balance'],
+                            0, '#eb4034',
+                            1000000, '#e1eb34',
+                            10000000, '#055c2a'
+                        ],
+                        "text-halo-color": "#000000",
+                        "text-halo-width": 2
+                    }
+                });
+
+                // {
+                //     'property': ' balance',
+                //     'interporlate': [
+                //         'linear',
+                //         -999999, '#d91414',
+                //         0, '#dbc60b',
+                //         1000000, '#0bdb38'
+                //     ]
+                // }
+
+                /*Inicializa a stream dos dados de trasações*/
+
+                const streamerr = e => {
+                    console.warn("Stream error");
+                    console.warn(e);
+                }
+
+                fetch("/v1/subscribe-live")
+                    .then((response) => can.ndjsonStream(response.body))
+                    .then(transactionsStream => {
+                        var reader = transactionsStream.getReader();
+
+                        reader.read().then(read = result => {
+                            if (result.done) {
+                                console.log("Done.");
+                                return;
+                            }
+
+                            var idx = sourceData.features.findIndex(t => t.properties.countryCode == result.value.country_code)
+                            if (idx >= 0) {
+                                sourceData.features[idx].properties.balance += result.value.balance_change
+                                sourceData.features[idx].properties.balanceFormatted = balanceFormatter.format(sourceData.features[idx].properties.balance)
+                            }
+                            map.getSource('countries').setData(sourceData);
+
+                            reader.read().then(read, streamerr);
+                        }, streamerr);
+                    });
+            }))
+    </script>
+
+</body>
+
+</html>
