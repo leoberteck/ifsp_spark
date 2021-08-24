@@ -1,8 +1,8 @@
 __pycache__/
 checkpoint/
 country_transactions/target/
-data/kafka/1_0/**
-data/kafka/2_0/**
-data/kafka/3_0/**
-data/kafka/zookeeper/**
-data/kafka/zookeeper/logs/**
+data/kafka/1_0/*
+data/kafka/2_0/*
+data/kafka/3_0/*
+data/kafka/zookeeper/*
+data/kafka/zookeeper/logs/*
