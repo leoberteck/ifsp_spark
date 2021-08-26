@@ -58,5 +58,6 @@ df = spark.readStream \
     .format("kafka")\
     .option("checkpointLocation", checkpoint_path)\
     .option("kafka.bootstrap.servers", kafka_bootstrap_server)\
+    .trigger(processingTime="5 seconds")\
     .start()\
     .awaitTermination()
